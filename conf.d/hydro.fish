@@ -39,10 +39,11 @@ function _hydro_prompt --on-event fish_prompt
     set --local last_status $pipestatus
     set --query _hydro_pwd || _hydro_pwd
     set --global _hydro_prompt "$_hydro_color_prompt$hydro_symbol_prompt"
+    set --global _hydro_right_prompt ""
 
     for code in $last_status
         if test $code -ne 0
-            set _hydro_prompt "$_hydro_color_error"[(string join "\x1b[2mǀ\x1b[22m" $last_status)]
+            set _hydro_right_prompt "$_hydro_color_error"[(string join "\x1b[2mǀ\x1b[22m" $last_status)]
             break
         end
     end
@@ -65,24 +66,7 @@ function _hydro_prompt --on-event fish_prompt
             count (command git ls-files --others --exclude-standard) >/dev/null &&
             set info \"$hydro_symbol_git_dirty\"
 
-        for fetch in $hydro_fetch false
-            command git rev-list --count --left-right @{upstream}...@ 2>/dev/null |
-                read behind ahead
-
-            switch \"\$behind \$ahead\"
-                case \" \" \"0 0\"
-                case \"0 *\"
-                    set upstream \" $hydro_symbol_git_ahead\$ahead\"
-                case \"* 0\"
-                    set upstream \" $hydro_symbol_git_behind\$behind\"
-                case \*
-                    set upstream \" $hydro_symbol_git_ahead\$ahead $hydro_symbol_git_behind\$behind\"
-            end
-
-            set --universal $_hydro_git \"\$branch\$info\$upstream \"
-
-            test \$fetch = true && command git fetch --no-tags 2>/dev/null
-        end
+        set --universal $_hydro_git \"(\$branch\$info) \"
     " &
 
     set --global _hydro_last_pid (jobs --last --pid)
