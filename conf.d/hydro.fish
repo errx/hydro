@@ -37,7 +37,7 @@ end
 
 function _hydro_prompt --on-event fish_prompt
     set --local last_status $pipestatus
-    set --query _hydro_pwd || _hydro_pwd
+    set --query _hydro_pwd || _hydro_pwd # if _hydro_pwd is not set call _hydro_pwd function (it will set _hydro_pwd var)
     set --global _hydro_prompt "$_hydro_color_prompt$hydro_symbol_prompt"
     set --global _hydro_right_prompt ""
 
@@ -48,27 +48,39 @@ function _hydro_prompt --on-event fish_prompt
         end
     end
 
-    command kill $_hydro_last_pid 2>/dev/null
+    # if rev-parse returned not zero then reset var and exit
+    # (probably not in a project)
+    ! command git --no-optional-locks rev-parse 2>/dev/null && set $_hydro_git && return
 
-    fish --private --command "
-        ! command git --no-optional-locks rev-parse 2>/dev/null && set $_hydro_git && exit
+    # parse branch
+    set branch (
+        command git symbolic-ref --short HEAD 2>/dev/null ||
+        command git describe --tags --exact-match HEAD 2>/dev/null ||
+        command git rev-parse --short HEAD 2>/dev/null |
+            string replace --regex -- '(.+)' '@\$1'
+    )
 
-        set branch (
-            command git symbolic-ref --short HEAD 2>/dev/null ||
-            command git describe --tags --exact-match HEAD 2>/dev/null ||
-            command git rev-parse --short HEAD 2>/dev/null |
-                string replace --regex -- '(.+)' '@\$1'
-        )
+    set info
+    #if _hydro_is_git_dirty
+    if ! command git diff-index --quiet HEAD 2>/dev/null
+        set info "$hydro_symbol_git_dirty"
+    end
 
-        ! command git diff-index --quiet HEAD 2>/dev/null ||
-            count (command git ls-files --others --exclude-standard) >/dev/null &&
-            set info \"$hydro_symbol_git_dirty\"
 
-        set --universal $_hydro_git \"(\$branch\$info) \"
-    " &
-
-    set --global _hydro_last_pid (jobs --last --pid)
+    set --universal $_hydro_git "($branch$info) "
 end
+
+#function _hydro_is_git_dirty -d "check if tree is dirty"
+#    if ! command git diff-index --quiet HEAD 2>/dev/null
+#        return 0
+#    end
+#    set --local cnt (count (command git ls-files --others --exclude-standard 2>/dev/null))
+#    if test $cnt -gt 0
+#        return 0
+#    else
+#        return 1
+#    end
+#end
 
 function _hydro_fish_exit --on-event fish_exit
     set --erase $_hydro_git
